@@ -1,0 +1,6 @@
+activate enviornment:
+.\.venv\Scripts\Activate.ps1  
+
+run server :
+set LLM_STUB=1
+uvicorn src.main:app --reload

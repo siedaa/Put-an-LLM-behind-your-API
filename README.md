@@ -20,3 +20,21 @@ Follow these steps to set up and run the throwaway LLM connection test script:
    ```bash
    python src/llm/hello.py
    ```
+
+## Testing Stage 1
+
+1. **Start the server** (with stub mode enabled):
+   ```bash
+   set LLM_STUB=1
+   uvicorn src.main:app --reload
+   ```
+
+2. **Valid request** (should return `200`):
+   ```bash
+   curl -X POST http://127.0.0.1:8000/triage -H "Content-Type: application/json" -d "{\"text\": \"I was charged twice for my subscription\"}"
+   ```
+
+3. **Invalid request — missing `text`** (should return `422`):
+   ```bash
+   curl -X POST http://127.0.0.1:8000/triage -H "Content-Type: application/json" -d "{}"
+   ```
