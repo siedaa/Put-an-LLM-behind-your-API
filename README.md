@@ -77,11 +77,30 @@ Parse, validate, repair-once, and quarantine logic is now live. The endpoint no 
 - `src/llm/client.py` — refactored with reusable `call_model(messages)` for multi-turn repair flow
 - `logs/.gitkeep` — keeps the logs folder tracked while `.jsonl` contents are gitignored
 
+## Stage 4 status
+
+Timeout, retry policy, cost logging, and a production kill switch are now live.
+
+**What was added:**
+- **Timeout**: every LLM call has a 30-second hard timeout (`client.py`).
+- **Retry with backoff**: exponential backoff + jitter, 3 attempts max. Retries on transient errors (408, 429, 500-503, network). Immediately fails on terminal errors (400, 401, 403). Respects `Retry-After` headers on 429s.
+- **Cost logging**: every successful response appends a line to `logs/cost.jsonl` with timestamp, prompt version, model, input/output tokens, duration, and `needed_repair` flag.
+- **Kill switch**: set `LLM_ENABLED=false` in `.env` to instantly disable all LLM calls (returns HTTP 503). Independent of `LLM_STUB`.
+
+**Kill switch test (2026-08-25):** Set `LLM_ENABLED=false`, sent a valid request, confirmed HTTP 503 with `{"detail":"LLM is disabled"}` and zero lines in `cost.jsonl`.
+
+**Files added/changed in Stage 4:**
+- `src/llm/retry.py` — `call_with_retry` with exponential backoff, jitter, and terminal-error detection
+- `src/llm/client.py` — `call_model` now returns a `ModelResponse` dataclass with token counts and duration; timeout set to 30s, SDK retries disabled
+- `src/main.py` — retry wrapping, `LLM_ENABLED` check, cost logging to `logs/cost.jsonl`, HTTP 504/502/503 for timeout/provider/disabled errors
+- `.env.example` — added `LLM_ENABLED=true`
+
 ## Current environment variables
 
 | Variable | Description |
 |---|---|
 | `LLM_BASE_URL` | OpenRouter API base URL (`https://openrouter.ai/api/v1`) |
 | `LLM_API_KEY` | Your OpenRouter API key (never commit this) |
-| `LLM_MODEL` | Model identifier (currently `google/gemma-4-26b-a4b-it:free`) |
+| `LLM_MODEL` | Model identifier (currently `liquid/lfm-2.5-2.6b:free`) |
 | `LLM_STUB` | Set to `1` to skip the real LLM call and return hardcoded stub data |
+| `LLM_ENABLED` | Set to `false` to disable all LLM calls (returns HTTP 503) |
