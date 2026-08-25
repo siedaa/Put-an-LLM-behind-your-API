@@ -13,4 +13,5 @@ ENV/
 
 # Logs
 logs/*.jsonl
+logs/server_stderr.txt
 *.log

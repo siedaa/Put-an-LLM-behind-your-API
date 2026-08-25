@@ -61,6 +61,22 @@ Prompt v1 is live at `prompts/triage-v1.md`. Manually tested against three real 
 
 ![screenshot of prompt response](screenshots/image1.png)
 
+## Stage 3 status
+
+Parse, validate, repair-once, and quarantine logic is now live. The endpoint no longer returns raw model text — every response is validated against `TriageResponse` before being returned.
+
+**How it works:**
+1. First attempt: call the model, parse JSON, validate against `TriageResponse`.
+2. If parsing or validation fails: send a repair request with a 4-turn message history (system, user, assistant with broken output, user with repair instruction).
+3. If the repair also fails: write a log entry to `logs/quarantine.jsonl` and return HTTP 422.
+
+**Forced failure test (2026-08-25):** Temporarily edited the prompt to force category `"urgent_billing_issue"` (not in the enum). Confirmed the endpoint returned HTTP 422 (not a crash, not raw text), and a new line appeared in `logs/quarantine.jsonl` with the timestamp, input text, prompt version, raw model output, and validation error.
+
+**Files added in Stage 3:**
+- `src/llm/parser.py` — extracts and parses JSON from model output, strips markdown code fences, never raises
+- `src/llm/client.py` — refactored with reusable `call_model(messages)` for multi-turn repair flow
+- `logs/.gitkeep` — keeps the logs folder tracked while `.jsonl` contents are gitignored
+
 ## Current environment variables
 
 | Variable | Description |
