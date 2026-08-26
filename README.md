@@ -105,6 +105,24 @@ Timeout, retry policy, cost logging, and a production kill switch are now live.
 | `LLM_STUB` | Set to `1` to skip the real LLM call and return hardcoded stub data |
 | `LLM_ENABLED` | Set to `false` to disable all LLM calls (returns HTTP 503) |
 
+## Stage 5 status
+
+Eval set and automated scoring are live.
+
+**What was added:**
+- **`evals/cases.json`** — 8 test cases covering clear/unambiguous messages, an ambiguous case, a vague "when unsure" case, a prompt-injection attempt, and varied categories/urgencies.
+- **`evals/run_eval.py`** — loads cases, POSTs each to the running server, compares `actual.category` against `expected_category`, prints per-case PASS/FAIL and a summary score.
+- **`requests`** added to `requirements.txt` for the eval script.
+
+**How to run:**
+1. Start the server (`LLM_STUB=0`, `LLM_ENABLED=true`)
+2. Run `.venv\Scripts\python.exe evals\run_eval.py 8000`
+3. Check per-case results and the final `X / 8 correct on category (Y%)` summary
+
+**Files added in Stage 5:**
+- `evals/cases.json` — 8-case eval set with expected outputs and notes
+- `evals/run_eval.py` — eval runner script
+
 ## Eval results
 
 Eval run twice on 2026-08-26 against `evals/cases.json` (8 cases) at prompt version `triage-v1`, using `google/gemma-4-26b-a4b-it:free` (subject to OpenRouter's free-tier rotation and congestion — see Provider notes above):
