@@ -100,7 +100,47 @@ Timeout, retry policy, cost logging, and a production kill switch are now live.
 | Variable | Description |
 |---|---|
 | `LLM_BASE_URL` | OpenRouter API base URL (`https://openrouter.ai/api/v1`) |
-| `LLM_API_KEY` | Your OpenRouter API key (never commit this) |
+| `LLM_API_KEY` | Your OpenRouter API key |
 | `LLM_MODEL` | Model identifier (currently `liquid/lfm-2.5-2.6b:free`) |
 | `LLM_STUB` | Set to `1` to skip the real LLM call and return hardcoded stub data |
 | `LLM_ENABLED` | Set to `false` to disable all LLM calls (returns HTTP 503) |
+
+## Eval results
+
+Eval run twice on 2026-08-26 against `evals/cases.json` (8 cases) at prompt version `triage-v1`, using `google/gemma-4-26b-a4b-it:free` (subject to OpenRouter's free-tier rotation and congestion — see Provider notes above):
+
+- **Run 1:** 8/8 correct on category (100%)
+- **Run 2:** 7/8 correct on category (88%) — case-4 failed with a 502 Bad Gateway after Stage 4's retry logic exhausted its attempts, due to upstream free-tier congestion, not a validation or parsing failure.
+
+Both runs are reported rather than only the higher score, because the point of an eval is to know what actually happens, not to cherry-pick the best result. Run 2 is arguably the more informative one: it's a live demonstration of the Stage 4 retry-then-fail-cleanly path working correctly under real provider instability, rather than a rare, purely theoretical code path.
+
+A perfect score on 8 cases also doesn't prove the system is bulletproof on the classification side — the eval set could be made harder (more ambiguous cases, more injection variants) to stress-test judgment quality specifically, separately from provider reliability.
+
+## Cost estimate
+
+This model is free on OpenRouter's tier, so actual cost is $0. For reference, a typical request used approximately 549 input tokens and 272 output tokens. If run against a comparably-sized paid model at example rates of $0.10 per million input tokens and $0.30 per million output tokens (illustrative only, not this model's actual pricing), that would be approximately $0.00014 per request, or $1.37 per 10,000 requests/day.
+
+## What I'd fix with another day
+
+- The free model lineup rotated twice during development (`nvidia/nemotron-nano-9b-v2:free`, then `meta-llama/llama-3.2-3b-instruct:free` both became unavailable) — in production this would need either a paid tier or a fallback list of models to try in order.
+- The eval set is fairly small (8 cases) and, on the classification side, fairly easy — expanding to 25 cases with an easy/hard split per the assignment's stretch goal would give a more meaningful score.
+- Retry/timeout behavior was validated by real provider congestion during testing (case-4's 502), which is good evidence, but the eval script doesn't currently retry failed HTTP calls itself, so a single transient failure counts as a full miss rather than being distinguished from an actual classification error.
+- The cost log doesn't break down first-attempt vs repair-attempt token usage, making it harder to measure how much the repair flow actually costs in practice — a `repair_attempt: true/false` field alongside `needed_repair` would help.
+
+## Runnable example
+
+```bash
+curl -X POST http://127.0.0.1:8000/triage -H "Content-Type: application/json" -d "{\"text\": \"I was charged twice for my subscription this month. Please refund the extra payment.\"}"
+```
+
+Response:
+
+```json
+{
+  "category": "billing",
+  "urgency": "high",
+  "suggested_team": "payments",
+  "confidence": 0.95,
+  "reason": "Customer reports a duplicate charge and requests a refund."
+}
+```
